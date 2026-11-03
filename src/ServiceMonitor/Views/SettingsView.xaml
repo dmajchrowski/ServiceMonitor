@@ -1,0 +1,166 @@
+<UserControl x:Class="ServiceMonitor.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:ServiceMonitor.UI">
+    <UserControl.Resources>
+        <!-- A labelled setting row: Tag = description -->
+        <Style x:Key="Row" TargetType="DockPanel">
+            <Setter Property="Margin" Value="0,10" />
+            <Setter Property="LastChildFill" Value="True" />
+        </Style>
+        <Style x:Key="NumberBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Width" Value="90" />
+            <Setter Property="DockPanel.Dock" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Right" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="36,30,36,36" MaxWidth="860" HorizontalAlignment="Left">
+            <TextBlock Style="{StaticResource PageTitle}" Text="Settings" />
+            <TextBlock Style="{StaticResource PageSubtitle}" Text="The defaults suit most sites. Changes apply as soon as you save." />
+
+            <!-- Site -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Site" />
+                    <TextBlock Text="Site or customer name" />
+                    <TextBox Margin="0,6,0,0" Text="{Binding Main.Config.SiteName, UpdateSourceTrigger=PropertyChanged}" ui:Placeholder.Text="e.g. Contoso – Head Office" />
+                    <TextBlock Style="{StaticResource Help}">
+                        <Run Text="Shown in every subject line together with the computer name, e.g. [ALERT] Contoso (" /><Run Text="{Binding Main.MachineName, Mode=OneWay}" /><Run Text="): … – so you can tell sites apart at a glance." />
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <!-- Detection -->
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Detection" />
+                    <DockPanel Style="{StaticResource Row}">
+                        <TextBox Style="{StaticResource NumberBox}" Text="{Binding Main.Config.Settings.PollIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                        <StackPanel>
+                            <TextBlock Text="Check every (seconds)" />
+                            <TextBlock Style="{StaticResource Help}" Text="Crashes and stops logged by Windows are also picked up instantly from the event log." />
+                        </StackPanel>
+                    </DockPanel>
+                    <DockPanel Style="{StaticResource Row}">
+                        <TextBox Style="{StaticResource NumberBox}" Text="{Binding Main.Config.Settings.HangThresholdSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                        <StackPanel>
+                            <TextBlock Text="Report a service as hung after (seconds)" />
+                            <TextBlock Style="{StaticResource Help}" Text="Time a service may spend Starting or Stopping before it counts as hung. Can be overridden per service." />
+                        </StackPanel>
+                    </DockPanel>
+                    <DockPanel Style="{StaticResource Row}">
+                        <TextBox Style="{StaticResource NumberBox}" Text="{Binding Main.Config.Settings.StartupGraceSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                        <StackPanel>
+                            <TextBlock Text="Startup grace period after a reboot (seconds)" />
+                            <TextBlock Style="{StaticResource Help}" Text="Services that simply haven't started yet after Windows boots are not reported during this time." />
+                        </StackPanel>
+                    </DockPanel>
+                    <CheckBox Margin="0,10,0,0" IsChecked="{Binding Main.Config.Settings.IncludeEventLogDetails}" Content="Include Windows event log details (crash reason, .NET exception) in alerts" />
+                </StackPanel>
+            </Border>
+
+            <!-- Alerts -->
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Alerts" />
+                    <DockPanel Style="{StaticResource Row}">
+                        <TextBox Style="{StaticResource NumberBox}" Text="{Binding Main.Config.Settings.ReminderIntervalMinutes, UpdateSourceTrigger=PropertyChanged}" />
+                        <StackPanel>
+                            <TextBlock Text="Remind every (minutes) while a service stays down" />
+                            <TextBlock Style="{StaticResource Help}" Text="0 = alert once only." />
+                        </StackPanel>
+                    </DockPanel>
+                    <DockPanel Style="{StaticResource Row}">
+                        <TextBox Style="{StaticResource NumberBox}" Text="{Binding Main.Config.Settings.MaxNotificationsPerServicePerHour, UpdateSourceTrigger=PropertyChanged}" />
+                        <StackPanel>
+                            <TextBlock Text="At most this many notifications per service per hour" />
+                            <TextBlock Style="{StaticResource Help}" Text="Flood protection for a service that keeps crashing and restarting. 0 = no limit." />
+                        </StackPanel>
+                    </DockPanel>
+                    <CheckBox Margin="0,8,0,0" IsChecked="{Binding Main.Config.Settings.NotifyOnRecovery}" Content="Send an all-clear when a service is running again" />
+                    <CheckBox Margin="0,8,0,0" IsChecked="{Binding Main.Config.Settings.NotifyOnSelfHealedCrash}" Content="Report crashes even when Windows restarted the service by itself" />
+                    <CheckBox Margin="0,8,0,0" IsChecked="{Binding Main.Config.Settings.NotifyOnMonitorStartStop}" Content="Notify when monitoring starts or stops (also tells you when the computer restarts)" />
+                </StackPanel>
+            </Border>
+
+            <!-- Auto restart -->
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Automatic restart" />
+                    <TextBlock Style="{StaticResource Help}" Margin="0,-4,0,4" Text="Applies to services where &quot;Restart it automatically&quot; is ticked on the Services page." />
+                    <DockPanel Style="{StaticResource Row}">
+                        <TextBox Style="{StaticResource NumberBox}" Text="{Binding Main.Config.Settings.RestartDelaySeconds, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Text="Wait before the first restart attempt (seconds)" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <DockPanel Style="{StaticResource Row}">
+                        <TextBox Style="{StaticResource NumberBox}" Text="{Binding Main.Config.Settings.MaxRestartAttempts, UpdateSourceTrigger=PropertyChanged}" />
+                        <StackPanel>
+                            <TextBlock Text="Give up after this many attempts" />
+                            <TextBlock Style="{StaticResource Help}" Text="The wait grows after each failed attempt. You get a final alert when the monitor gives up." />
+                        </StackPanel>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Heartbeat -->
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Heartbeat" />
+                    <TextBlock Style="{StaticResource Help}" Margin="0,-4,0,8"
+                               Text="A regular &quot;all good&quot; summary. If it stops arriving, something is wrong with the server, the monitor or the mailbox – silence is never mistaken for health." />
+                    <StackPanel Orientation="Horizontal">
+                        <StackPanel>
+                            <TextBlock Text="Send" Margin="0,0,0,6" />
+                            <ComboBox Width="130" ItemsSource="{Binding HeartbeatOptions}" SelectedItem="{Binding Main.Config.Settings.Heartbeat}" />
+                        </StackPanel>
+                        <StackPanel Margin="12,0,0,0">
+                            <TextBlock Text="On (weekly)" Margin="0,0,0,6" />
+                            <ComboBox Width="150" ItemsSource="{Binding Days}" SelectedItem="{Binding Main.Config.Settings.HeartbeatDay}" />
+                        </StackPanel>
+                        <StackPanel Margin="12,0,0,0">
+                            <TextBlock Text="At hour" Margin="0,0,0,6" />
+                            <ComboBox Width="90" ItemsSource="{Binding Hours}" SelectedItem="{Binding Main.Config.Settings.HeartbeatHour}" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Advanced -->
+            <Expander Header="Advanced: OAuth app registrations" Margin="0,16,0,0">
+                <Border Style="{StaticResource Card}" Margin="0,8,0,0">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Help}" FontSize="13" Margin="0"
+                                   Text="&quot;Sign in with Microsoft&quot; and &quot;Sign in with Google&quot; need an app registration that your organization creates once (see docs\OAUTH-APP-REGISTRATION.md). They are normally built into the program at publish time; enter values here only to override them on this computer." />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Microsoft Application (client) ID" />
+                        <TextBox Text="{Binding Main.Config.OAuth.MicrosoftClientId, UpdateSourceTrigger=PropertyChanged}" ui:Placeholder.Text="{Binding BuiltInMicrosoft}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Microsoft tenant" />
+                        <TextBox Text="{Binding Main.Config.OAuth.MicrosoftTenant, UpdateSourceTrigger=PropertyChanged}" ui:Placeholder.Text="common (personal and work accounts)" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Google OAuth client ID" />
+                        <TextBox Text="{Binding Main.Config.OAuth.GoogleClientId, UpdateSourceTrigger=PropertyChanged}" ui:Placeholder.Text="{Binding BuiltInGoogle}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Google OAuth client secret" />
+                        <TextBox Text="{Binding Main.Config.OAuth.GoogleClientSecret, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource Help}" Text="For Google desktop apps this value is not confidential; Google requires it anyway." />
+                    </StackPanel>
+                </Border>
+            </Expander>
+
+            <!-- Maintenance -->
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="Files and removal" />
+                    <TextBlock Style="{StaticResource Help}" FontSize="13" Margin="0">
+                        <Run Text="Settings, encrypted sign-ins, status and logs are stored in" /> <Run Text="{Binding DataFolder, Mode=OneWay}" FontFamily="Consolas" /><Run Text=", readable only by Administrators and SYSTEM." />
+                    </TextBlock>
+                    <WrapPanel Margin="0,12,0,0">
+                        <Button Content="Open data folder" Command="{Binding Main.OpenDataFolderCommand}" Margin="0,0,8,0" />
+                        <Button Content="Open logs" Command="{Binding Main.OpenLogsFolderCommand}" Margin="0,0,8,0" />
+                        <Button Content="Remove monitor from this computer…" Command="{Binding UninstallCommand}" />
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

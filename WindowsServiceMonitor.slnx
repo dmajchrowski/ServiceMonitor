@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ServiceMonitor.Core/ServiceMonitor.Core.csproj" />
+    <Project Path="src/ServiceMonitor/ServiceMonitor.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ServiceMonitor.Core.Tests/ServiceMonitor.Core.Tests.csproj" />
+  </Folder>
+</Solution>

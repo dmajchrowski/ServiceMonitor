@@ -1,0 +1,440 @@
+<UserControl x:Class="ServiceMonitor.Views.ChannelsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:ServiceMonitor.ViewModels"
+             xmlns:ui="clr-namespace:ServiceMonitor.UI">
+    <UserControl.Resources>
+        <!-- Recipients box shared by all email channels -->
+        <DataTemplate x:Key="RecipientsTemplate">
+            <StackPanel>
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Send alerts to" />
+                <TextBox Text="{Binding Recipients, UpdateSourceTrigger=PropertyChanged}" ui:Placeholder.Text="tech1@example.com, oncall@example.com" />
+                <TextBlock Style="{StaticResource Help}" Text="Separate addresses with commas. Leave empty to send to the sending account itself." />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Sign-in block shared by Microsoft and Google -->
+        <DataTemplate x:Key="SignInTemplate">
+            <StackPanel>
+                <!-- Signed in -->
+                <Border Style="{StaticResource InfoBarSuccess}" Margin="0,4,0,0"
+                        Visibility="{Binding IsSignedIn, Converter={StaticResource BoolToVisibility}}">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Sign out" Command="{Binding SignOutCommand}" Margin="12,0,0,0" />
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xEC61;" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
+                            <TextBlock Margin="10,0,0,0" VerticalAlignment="Center">
+                                <Run Text="Signed in as" /> <Run Text="{Binding SignedInAccount, Mode=OneWay}" FontWeight="SemiBold" />
+                            </TextBlock>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- Sign-in buttons -->
+                <WrapPanel Margin="0,10,0,0" Visibility="{Binding IsSigningIn, Converter={StaticResource InverseBoolToVisibility}}">
+                    <Button Command="{Binding SignInCommand}" Style="{StaticResource AccentButtonStyle}" Margin="0,0,12,0" Padding="16,7">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE8D7;" FontSize="14" />
+                            <TextBlock Margin="8,0,0,0" Text="{Binding SignInButtonText}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource LinkButton}" VerticalAlignment="Center"
+                            Content="No browser on this server? Sign in on your phone with a code" Command="{Binding SignInWithCodeCommand}"
+                            Visibility="{Binding SupportsDeviceCode, Converter={StaticResource BoolToVisibility}}" />
+                </WrapPanel>
+
+                <!-- Waiting -->
+                <Border Style="{StaticResource InfoBar}" Margin="0,10,0,0" Visibility="{Binding IsSigningIn, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Cancel" Command="{Binding CancelSignInCommand}" Margin="12,0,0,0" VerticalAlignment="Top" />
+                            <StackPanel>
+                                <TextBlock FontWeight="SemiBold" Text="Waiting for you to finish signing in…"
+                                           Visibility="{Binding DeviceCode, Converter={StaticResource NullToCollapsedInverse}}" />
+                                <TextBlock Style="{StaticResource Help}" Visibility="{Binding DeviceCode, Converter={StaticResource NullToCollapsedInverse}}"
+                                           Text="A browser window opened. Sign in with the account alerts should be sent from and allow access. Use the account's own password – the monitor never sees it." />
+                                <Button Style="{StaticResource LinkButton}" Margin="0,8,0,0" Content="Browser didn't open? Copy the sign-in link"
+                                        Command="{Binding CopySignInLinkCommand}" Visibility="{Binding SignInLink, Converter={StaticResource NullToVisibility}}" />
+                            </StackPanel>
+                        </DockPanel>
+                        <!-- Device code -->
+                        <StackPanel Visibility="{Binding DeviceCode, Converter={StaticResource NullToVisibility}}" Margin="0,4,0,0">
+                            <TextBlock TextWrapping="Wrap">
+                                <Run Text="On your phone or any computer, open" /> <Run Text="{Binding DeviceUrl, Mode=OneWay}" FontWeight="SemiBold" /> <Run Text="and enter this code:" />
+                            </TextBlock>
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <TextBox Text="{Binding DeviceCode, Mode=OneWay}" IsReadOnly="True" FontSize="26" FontFamily="Consolas" FontWeight="Bold" Padding="12,4" />
+                                <Button Content="Copy code" Command="{Binding CopyDeviceCodeCommand}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                <Button Content="Open page here" Command="{Binding OpenDeviceUrlCommand}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </StackPanel>
+                        <ProgressBar IsIndeterminate="True" Margin="0,12,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource InfoBarError}" Margin="0,10,0,0" Visibility="{Binding SignInError, Converter={StaticResource NullToVisibility}}">
+                    <TextBlock Text="{Binding SignInError}" TextWrapping="Wrap" />
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- ===================== Gmail ===================== -->
+        <DataTemplate DataType="{x:Type vm:GmailChannelViewModel}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource FieldLabel}" Text="How should the monitor send from Gmail?" />
+                <RadioButton GroupName="gmailmode" IsChecked="{Binding UseAppPassword}" Content="App password (recommended for technician accounts)" />
+                <TextBlock Style="{StaticResource Help}" Margin="28,0,0,8" Text="Works with any personal Gmail account. Takes about two minutes and needs nothing from IT." />
+                <RadioButton GroupName="gmailmode" IsChecked="{Binding UseOAuth}" Content="Sign in with Google" IsEnabled="{Binding GoogleConfigured}" />
+                <TextBlock Style="{StaticResource Help}" Margin="28,0,0,0"
+                           Text="Only available when your organization has built a Google OAuth client into this program (see the setup guide)."
+                           Visibility="{Binding GoogleConfigured, Converter={StaticResource InverseBoolToVisibility}}" />
+
+                <!-- App password -->
+                <StackPanel Visibility="{Binding UseAppPassword, Converter={StaticResource BoolToVisibility}}">
+                    <Border Style="{StaticResource InfoBar}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock FontWeight="SemiBold" Text="Create an app password" />
+                            <TextBlock Style="{StaticResource Help}" Margin="0,6,0,0" FontSize="13"
+                                       Text="1. In a browser, sign in to the Gmail account that will send the alerts.&#x0a;2. Turn on 2-Step Verification (Google requires it for app passwords).&#x0a;3. Open App passwords, type a name such as &quot;Service Monitor&quot; and click Create.&#x0a;4. Copy the 16-letter password Google shows and paste it below." />
+                            <WrapPanel Margin="0,10,0,0">
+                                <Button Content="Open 2-Step Verification" Command="{Binding OpenTwoStepCommand}" Margin="0,0,8,0" />
+                                <Button Content="Open App passwords" Command="{Binding OpenAppPasswordsCommand}" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="Gmail address" />
+                    <TextBox Text="{Binding Account, UpdateSourceTrigger=PropertyChanged}" ui:Placeholder.Text="site.alerts@gmail.com" />
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="App password" />
+                    <PasswordBox ui:PasswordBoxAssist.BoundPassword="{Binding AppPassword}" />
+                    <TextBlock Style="{StaticResource Help}" Text="Stored encrypted on this computer. Spaces are removed automatically." />
+                </StackPanel>
+
+                <!-- OAuth -->
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource SignInTemplate}" Margin="0,8,0,0"
+                                Visibility="{Binding UseOAuth, Converter={StaticResource BoolToVisibility}}" />
+
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource RecipientsTemplate}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- ===================== Microsoft ===================== -->
+        <DataTemplate DataType="{x:Type vm:MicrosoftChannelViewModel}">
+            <StackPanel>
+                <Border Style="{StaticResource InfoBarWarning}" Margin="0,8,0,0"
+                        Visibility="{Binding MicrosoftConfigured, Converter={StaticResource InverseBoolToVisibility}}">
+                    <TextBlock TextWrapping="Wrap"
+                               Text="Sign in with Microsoft needs a one-time app registration by your IT administrator (free, about 5 minutes – see docs\OAUTH-APP-REGISTRATION.md). Once its Application (client) ID is built into this program or entered under Settings → Advanced, technicians only have to click Sign in." />
+                </Border>
+                <TextBlock Style="{StaticResource Help}" FontSize="13" Margin="0,12,0,0"
+                           Text="Works with outlook.com, hotmail.com and live.com accounts as well as Microsoft 365 work accounts. Microsoft no longer accepts passwords from other apps, so this uses a secure sign-in instead; mail is sent through Microsoft Graph and is kept in the account's Sent Items." />
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource SignInTemplate}" Margin="0,4,0,0"
+                                IsEnabled="{Binding MicrosoftConfigured}" />
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource RecipientsTemplate}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- ===================== SMTP ===================== -->
+        <DataTemplate DataType="{x:Type vm:SmtpChannelViewModel}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Email provider" />
+                <ComboBox ItemsSource="{Binding ProviderOptions}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding ProviderId}"
+                          MinWidth="240" HorizontalAlignment="Left" />
+
+                <!-- Yahoo / iCloud: address + app password, server settings filled in -->
+                <StackPanel Visibility="{Binding IsPreset, Converter={StaticResource BoolToVisibility}}">
+                    <Border Style="{StaticResource InfoBar}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock FontWeight="SemiBold" Text="Create an app password" />
+                            <TextBlock Style="{StaticResource Help}" Margin="0,6,0,0" FontSize="13" Text="{Binding Preset.Instructions}" />
+                            <Button Margin="0,10,0,0" HorizontalAlignment="Left" Content="{Binding Preset.AccountPageButton}" Command="{Binding OpenAccountPageCommand}" />
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="{Binding AddressLabel}" />
+                    <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" ui:Placeholder.Text="{Binding Preset.AddressExample}" />
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="App password" />
+                    <PasswordBox ui:PasswordBoxAssist.BoundPassword="{Binding Password}" />
+                    <TextBlock Style="{StaticResource Help}" Text="{Binding ServerSummary}" />
+                </StackPanel>
+
+                <!-- Any other server -->
+                <StackPanel Visibility="{Binding IsPreset, Converter={StaticResource InverseBoolToVisibility}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="150" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="SMTP server" />
+                            <TextBox Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}" ui:Placeholder.Text="smtp.example.com" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Port" />
+                            <TextBox Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Encryption" />
+                            <ComboBox ItemsSource="{Binding SecurityOptions}" SelectedItem="{Binding Security}" HorizontalAlignment="Stretch" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Style="{StaticResource Help}" Text="Auto picks the right encryption for the port (587 = STARTTLS, 465 = SSL). Use None only for an internal relay." />
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="User name (leave empty if the server doesn't need sign-in)" />
+                    <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="Password" />
+                    <PasswordBox ui:PasswordBoxAssist.BoundPassword="{Binding Password}" />
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="From address" />
+                    <TextBox Text="{Binding From, UpdateSourceTrigger=PropertyChanged}" ui:Placeholder.Text="Same as user name" />
+                </StackPanel>
+                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource RecipientsTemplate}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- ===================== Teams / Slack / Discord ===================== -->
+        <DataTemplate DataType="{x:Type vm:WebhookUrlChannelViewModel}">
+            <StackPanel>
+                <Border Style="{StaticResource InfoBar}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Get the webhook URL" />
+                        <TextBlock Style="{StaticResource Help}" FontSize="13" Margin="0,6,0,0" Text="{Binding Instructions}" />
+                    </StackPanel>
+                </Border>
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Webhook URL" />
+                <TextBox Text="{Binding WebhookUrl, UpdateSourceTrigger=PropertyChanged}" ui:Placeholder.Text="https://…" />
+                <TextBlock Style="{StaticResource Help}" Text="Anyone with this URL can post to the channel, so it is stored encrypted on this computer." />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- ===================== ntfy ===================== -->
+        <DataTemplate DataType="{x:Type vm:NtfyChannelViewModel}">
+            <StackPanel>
+                <Border Style="{StaticResource InfoBar}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Get alerts as push notifications on your phone" />
+                        <TextBlock Style="{StaticResource Help}" FontSize="13" Margin="0,6,0,0"
+                                   Text="1. Install the free ntfy app (Google Play, F-Droid or the App Store).&#x0a;2. Click Generate below to create a private topic name.&#x0a;3. In the app tap +, enter the topic name and subscribe. Every technician who should be paged can subscribe to the same topic.&#x0a;Critical alerts are sent with urgent priority so they break through quiet mode (if allowed in the app)." />
+                    </StackPanel>
+                </Border>
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Topic" />
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Generate" Command="{Binding GenerateTopicCommand}" Margin="8,0,0,0" />
+                    <TextBox Text="{Binding Topic, UpdateSourceTrigger=PropertyChanged}" ui:Placeholder.Text="svcmon-yoursite-…" />
+                </DockPanel>
+                <TextBlock Style="{StaticResource Help}" Text="On the public ntfy.sh server anyone who knows the topic can read it – use the generated, hard-to-guess name." />
+                <Button Style="{StaticResource LinkButton}" Margin="0,6,0,0" Command="{Binding OpenSubscribeCommand}"
+                        Content="{Binding SubscribeLinkText}" Visibility="{Binding Topic, Converter={StaticResource NullToVisibility}}" />
+                <Expander Header="Self-hosted server or protected topic" Margin="0,14,0,0">
+                    <StackPanel Margin="0,4,0,0">
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Server" />
+                        <TextBox Text="{Binding ServerUrl, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Access token (optional)" />
+                        <PasswordBox ui:PasswordBoxAssist.BoundPassword="{Binding AccessToken}" />
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- ===================== Telegram ===================== -->
+        <DataTemplate DataType="{x:Type vm:TelegramChannelViewModel}">
+            <StackPanel>
+                <Border Style="{StaticResource InfoBar}" Margin="0,12,0,0">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="Create a Telegram bot" />
+                        <TextBlock Style="{StaticResource Help}" FontSize="13" Margin="0,6,0,0"
+                                   Text="1. In Telegram, open a chat with @BotFather, send /newbot and follow the prompts.&#x0a;2. Paste the bot token it gives you below.&#x0a;3. Send any message to your new bot (or add it to a group and post there).&#x0a;4. Click Find chat ID." />
+                    </StackPanel>
+                </Border>
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Bot token" />
+                <PasswordBox ui:PasswordBoxAssist.BoundPassword="{Binding BotToken}" />
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Chat ID" />
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Find chat ID" Command="{Binding DetectChatIdCommand}" Margin="8,0,0,0" />
+                    <TextBox Text="{Binding ChatId, UpdateSourceTrigger=PropertyChanged}" />
+                </DockPanel>
+                <TextBlock Style="{StaticResource Help}" Text="{Binding DetectMessage}" Visibility="{Binding DetectMessage, Converter={StaticResource NullToVisibility}}" />
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- ===================== Generic webhook ===================== -->
+        <DataTemplate DataType="{x:Type vm:WebhookChannelViewModel}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource Help}" FontSize="13" Margin="0,12,0,0"
+                           Text="Each notification is sent as an HTTP POST with a JSON body (id, kind, severity, title, summary, machine, site, service, time, facts, events). Use it to feed RMM/PSA tools, Power Automate, n8n, Zapier or an on-call service." />
+                <TextBlock Style="{StaticResource FieldLabel}" Text="URL" />
+                <TextBox Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}" ui:Placeholder.Text="https://…" />
+                <Grid Margin="0,0,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Header name (optional)" />
+                        <TextBox Text="{Binding HeaderName, UpdateSourceTrigger=PropertyChanged}" ui:Placeholder.Text="Authorization" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Header value" />
+                        <PasswordBox ui:PasswordBoxAssist.BoundPassword="{Binding HeaderValue}" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </DataTemplate>
+
+        <!-- Channel type picker card -->
+        <DataTemplate x:Key="ChannelTypeTemplate">
+            <Button Margin="0,0,10,10" Width="300" HorizontalContentAlignment="Stretch" Padding="14,12"
+                    Command="{Binding DataContext.AddCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="{Binding Glyph}" FontSize="22" VerticalAlignment="Top" Margin="0,2,14,0"
+                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                    <StackPanel>
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                        <TextBlock Style="{StaticResource Help}" Text="{Binding Description}" />
+                    </StackPanel>
+                </DockPanel>
+            </Button>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid Margin="36,30,36,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBlock Style="{StaticResource PageTitle}" Text="Notifications" />
+        <TextBlock Grid.Row="1" Style="{StaticResource PageSubtitle}"
+                   Text="Where alerts are sent. Every alert goes to all enabled channels, and each channel retries on its own if it is temporarily unreachable." />
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Channel list -->
+            <DockPanel>
+                <Button DockPanel.Dock="Top" Command="{Binding ShowAddCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" Margin="0,0,0,12">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="14" />
+                        <TextBlock Margin="8,0,0,0" Text="Add channel" />
+                    </StackPanel>
+                </Button>
+                <UniformGrid DockPanel.Dock="Bottom" Columns="2" Margin="0,8,0,0">
+                    <Button Command="{Binding ExportCommand}" HorizontalAlignment="Stretch" Margin="0,0,4,0" AutomationProperties.Name="Export channels"
+                            ToolTip="Save all channels, with their passwords, to a password-protected file">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xEDE1;" FontSize="14" />
+                            <TextBlock Margin="8,0,0,0" Text="Export…" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ImportCommand}" HorizontalAlignment="Stretch" Margin="4,0,0,0" AutomationProperties.Name="Import channels"
+                            ToolTip="Add the channels from an exported file">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE8B5;" FontSize="14" />
+                            <TextBlock Margin="8,0,0,0" Text="Import…" />
+                        </StackPanel>
+                    </Button>
+                </UniformGrid>
+                <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" ItemContainerStyle="{StaticResource CardListItem}"
+                         Background="Transparent" BorderThickness="0" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel>
+                                <CheckBox DockPanel.Dock="Right" IsChecked="{Binding Enabled}" ToolTip="Enabled" MinWidth="0" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="{Binding Glyph}" FontSize="20" Margin="0,0,12,0"
+                                           Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <!-- NoWrap: the caption style wraps, so a long webhook host took three lines instead of ending in "…" -->
+                                    <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"
+                                               TextWrapping="NoWrap" ToolTip="{Binding Summary}"
+                                               Text="{Binding Summary}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+
+            <!-- Right side -->
+            <Border Grid.Column="1" Style="{StaticResource Card}" Margin="16,0,0,0" Padding="0">
+                <Grid>
+                    <!-- Add picker -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding IsAdding, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Margin="24,20">
+                            <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Add a notification channel" FontSize="18" />
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="Email" Margin="0,18,0,10" />
+                            <ItemsControl ItemsSource="{Binding EmailTypes}" ItemTemplate="{StaticResource ChannelTypeTemplate}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                            <TextBlock Style="{StaticResource SectionHeader}" Text="Push, chat and integrations" Margin="0,12,0,10" />
+                            <ItemsControl ItemsSource="{Binding OtherTypes}" ItemTemplate="{StaticResource ChannelTypeTemplate}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Editor -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding IsAdding, Converter={StaticResource InverseBoolToVisibility}}">
+                        <StackPanel Margin="24,20" DataContext="{Binding Selected}" MaxWidth="720" HorizontalAlignment="Left"
+                                    Visibility="{Binding DataContext.Selected, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource NullToVisibility}}">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" VerticalAlignment="Top" ToolTip="Remove this channel"
+                                        Command="{Binding DataContext.RemoveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE74D;" FontSize="14" />
+                                        <TextBlock Margin="8,0,0,0" Text="Remove" />
+                                    </StackPanel>
+                                </Button>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding KindLabel}" />
+                                    <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" FontSize="18" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </DockPanel>
+
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabel}" Text="Channel name" />
+                                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="1" Content="Enabled" IsChecked="{Binding Enabled}" VerticalAlignment="Bottom" Margin="16,0,0,4" />
+                            </Grid>
+
+                            <ContentControl Content="{Binding}" Focusable="False" />
+
+                            <Separator Margin="0,24,0,16" />
+                            <DockPanel>
+                                <Button DockPanel.Dock="Left" Command="{Binding TestCommand}" IsEnabled="{Binding IsTesting, Converter={StaticResource InverseBool}}" VerticalAlignment="Top">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Icon}" Text="&#xE724;" FontSize="14" />
+                                        <TextBlock Margin="8,0,0,0" Text="Send test" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Style="{StaticResource Help}" Margin="12,6,0,0" Text="Sends a test message through this channel only. You can test before saving." />
+                            </DockPanel>
+                            <ProgressBar IsIndeterminate="True" Margin="0,12,0,0" Visibility="{Binding IsTesting, Converter={StaticResource BoolToVisibility}}" />
+                            <Border Margin="0,12,0,0" Visibility="{Binding TestMessage, Converter={StaticResource NullToVisibility}}">
+                                <Border.Style>
+                                    <Style TargetType="Border" BasedOn="{StaticResource InfoBarError}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding TestSucceeded}" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource SystemFillColorSuccessBackgroundBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="{Binding TestMessage}" TextWrapping="Wrap" />
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

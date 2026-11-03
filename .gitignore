@@ -1,0 +1,12 @@
+bin/
+obj/
+dist/
+*.user
+.vs/
+TestResults/
+
+# Kept local, never published: test records with real addresses, and notes about the publisher's own setup.
+docs/test-records/
+docs/INSTALLER-NOTES-FROM-PORTBRIDGE.md
+# Channel exports carry passwords and tokens (encrypted, but still private).
+*.smchannels

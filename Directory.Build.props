@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- The one place the version is kept: the exe, build\publish.ps1 and the setup (installer\ServiceMonitor.iss) read it. -->
+    <Version>1.0.11</Version>
+  </PropertyGroup>
+</Project>
